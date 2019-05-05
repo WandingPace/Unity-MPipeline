@@ -43,7 +43,12 @@ namespace MPipeline
             public CommandBuffer buffer;
         }
         private static List<EditorBakeCommand> bakeList = new List<EditorBakeCommand>();
-        public static void AddRenderingMissionInEditor(NativeList<float4x4> worldToCameras, NativeList<float4x4> projections, PipelineCamera targetCameras, RenderTexture texArray, CommandBuffer buffer)
+        public static void AddRenderingMissionInEditor(
+            NativeList<float4x4> worldToCameras, 
+            NativeList<float4x4> projections, 
+            PipelineCamera targetCameras, 
+            RenderTexture texArray, 
+            CommandBuffer buffer)
         {
             bakeList.Add(new EditorBakeCommand
             {
@@ -155,10 +160,9 @@ namespace MPipeline
                 {
                     pipelineCam.cam.worldToCameraMatrix = pair.worldToCamera[i];
                     pipelineCam.cam.projectionMatrix = pair.projection[i];
-                    pipelineCam.cam.cullingMatrix = pair.projection[i] * pair.worldToCamera[i];
-                    Render(pipelineCam, ref renderContext, pipelineCam.cam, propertyCheckedFlags);
+                    pipelineCam.cameraTarget = tempID;
                     data.buffer.GetTemporaryRT(tempID, pair.texArray.width, pair.texArray.height, pair.texArray.depth, FilterMode.Point, pair.texArray.format, RenderTextureReadWrite.Linear);
-                    data.buffer.Blit(BuiltinRenderTextureType.CameraTarget, tempID);
+                    Render(pipelineCam, ref renderContext, pipelineCam.cam, propertyCheckedFlags);
                     data.buffer.CopyTexture(tempID, 0, 0, pair.texArray, i, 0);
                     data.buffer.ReleaseTemporaryRT(tempID);
                     data.ExecuteCommandBuffer();
@@ -202,16 +206,28 @@ namespace MPipeline
                     data.ExecuteCommandBuffer();
                     renderContext.Submit();
                 }
-            }
-            if (bufferAfterFrame.Count > 0)
-            {
-                foreach (var i in bufferAfterFrame)
+                if (bufferAfterFrame.Count > 0)
                 {
-                    i(data.buffer);
+                    foreach (var i in bufferAfterFrame)
+                    {
+                        i(data.buffer);
+                    }
+                    data.ExecuteCommandBuffer();
+                    bufferAfterFrame.Clear();
+                    renderContext.Submit();
                 }
-                data.ExecuteCommandBuffer();
-                bufferAfterFrame.Clear();
-                renderContext.Submit();
+            }
+            else
+            {
+                if (bufferAfterFrame.Count > 0)
+                {
+                    foreach (var i in bufferAfterFrame)
+                    {
+                        i(data.buffer);
+                    }
+                    Graphics.ExecuteCommandBuffer(data.buffer);
+                    bufferAfterFrame.Clear();
+                }
             }
         }
         private void Render(PipelineCamera pipelineCam, ref ScriptableRenderContext context, Camera cam, bool* pipelineChecked)
