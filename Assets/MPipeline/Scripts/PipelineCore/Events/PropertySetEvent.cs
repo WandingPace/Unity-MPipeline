@@ -15,16 +15,22 @@ namespace MPipeline
     {
         public CullingResults cullResults;
         public ScriptableCullingParameters cullParams;
+        [System.NonSerialized]
         public Vector4[] frustumPlanes = new Vector4[6];
         public float4x4 lastViewProjection { get; private set; }
         public float4x4 inverseLastViewProjection { get; private set; }
+        [System.NonSerialized]
         public float4x4 VP;
+        [System.NonSerialized]
         public float4x4 inverseVP;
         private Random rand;
         private CalculateMatrixJob calculateJob;
         private JobHandle handle;
         public Matrix4x4 inverseNonJitterVP { get; private set; }
-        private System.Func<PipelineCamera, LastVPData> getLastVP = (c) => {
+        [System.NonSerialized]
+        public Material overrideOpaqueMaterial;
+        private System.Func<PipelineCamera, LastVPData> getLastVP = (c) =>
+        {
             float4x4 p = GraphicsUtility.GetGPUProjectionMatrix(c.cam.projectionMatrix, false);
             float4x4 vp = mul(p, c.cam.worldToCameraMatrix);
             return new LastVPData(vp);
@@ -80,15 +86,17 @@ namespace MPipeline
         }
         protected override void Init(PipelineResources resources)
         {
+            overrideOpaqueMaterial = new Material(resources.shaders.overrideOpaqueShader);
             rand = new Random((uint)System.Guid.NewGuid().GetHashCode());
             Shader.SetGlobalMatrix(ShaderIDs._LastFrameModel, Matrix4x4.zero);
         }
         protected override void Dispose()
         {
+            DestroyImmediate(overrideOpaqueMaterial);
         }
         public override bool CheckProperty()
         {
-            return true;
+            return overrideOpaqueMaterial;
         }
         [BurstCompile]
         private struct CalculateMatrixJob : IJob

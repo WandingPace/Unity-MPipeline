@@ -20,7 +20,7 @@ float4 ProceduralStandardSpecular_Deferred (inout SurfaceOutputStandardSpecular 
 
     // RT2: normal (rgb), --unused, very low precision-- (a)
 
-    outGBuffer2 = float4(s.Normal * 0.5f + 0.5f, 0);
+    outGBuffer2 = float4(s.Normal * 0.5f + 0.5f, 1);
 
 
 		float4 emission = float4(s.Emission, 1);
@@ -89,10 +89,9 @@ void frag_surf (v2f_surf IN,
     out float4 outGBuffer0 : SV_Target0,
     out float4 outGBuffer1 : SV_Target1,
     out float4 outGBuffer2 : SV_Target2,
-    out float4 outEmission : SV_Target3,
-  out float depth : SV_TARGET4
+    out float4 outEmission : SV_Target3
 ) {
-	depth = IN.pos.z;
+	
   // prepare and unpack data
   Input surfIN;
   surfIN.uv_MainTex = IN.pack0.xy;
@@ -104,7 +103,9 @@ void frag_surf (v2f_surf IN,
   surf (surfIN, o);
   o.Normal = normalize(mul(normalize(o.Normal), wdMatrix));
   outEmission = ProceduralStandardSpecular_Deferred (o, worldViewDir, outGBuffer0, outGBuffer1, outGBuffer2); //GI neccessary here!
+	#if LIT_ENABLE
 	#if LIGHTMAP_ON
+	outGBuffer2.w = 0;
 	UnityGIInput giInput = (UnityGIInput)0;
 	giInput.atten = 1;
 	giInput.worldPos = worldPos;
@@ -113,13 +114,7 @@ void frag_surf (v2f_surf IN,
 	outEmission.xyz += giResult.indirect.diffuse;
   //outEmission.xyz += unity_Lightmap.Sample(samplerunity_Lightmap, IN.lightmapUV).xyz* o.Albedo;
 	#endif
-/*
-	float4 velocity = float4(IN.nonJitterScreenPos.xy, IN.lastScreenPos.xy) / float4(IN.nonJitterScreenPos.zz, IN.lastScreenPos.zz);
-  #if UNITY_UV_STARTS_AT_TOP
-	outMotionVector = velocity.xw - velocity.zy;
-	#else
-	outMotionVector = velocity.xy - velocity.zw;
-	#endif*/
+	#endif
 }
 
 #endif

@@ -50,6 +50,7 @@ namespace MPipeline
         private float* clipDistances;
         private OrthoCam* sunShadowCams;
         private Material lightingMaterial;
+        
         private PropertySetEvent proper;
 
         public override bool CheckProperty()
@@ -186,12 +187,13 @@ namespace MPipeline
         {
             RenderTargetIdentifier source, dest;
             PipelineFunctions.RunPostProcess(ref cam.targets, out source, out dest);
-            data.buffer.BlitSRT(source, dest, cam.targets.depthBuffer, lightingMaterial, 0);
+            data.buffer.BlitSRT(source, dest, ShaderIDs._DepthBufferTexture, lightingMaterial, 0);
+            data.buffer.BlitSRT(source, dest, ShaderIDs._DepthBufferTexture, lightingMaterial, 1);
             //Calculate CBDR
             DirLight(cam, ref data);
             PointLight(cam, ref data);
             //Calculate Lighting
-            data.buffer.BlitSRTWithDepth(cam.targets.renderTargetIdentifier, cam.targets.depthBuffer, lightingMaterial, 1);
+            data.buffer.BlitSRTWithDepth(cam.targets.renderTargetIdentifier, ShaderIDs._DepthBufferTexture, lightingMaterial, 2);
             LightFilter.Clear();
         }
         private void DirLight(PipelineCamera cam, ref PipelineCommandData data)
@@ -218,7 +220,7 @@ namespace MPipeline
                     SunLight.current.farestDistance));//Only Mask
                 buffer.SetGlobalVector(ShaderIDs._SoftParam, SunLight.current.cascadeSoftValue / SunLight.current.resolution);
                 csmHandle.Complete();
-                SceneController.DrawDirectionalShadow(cam, ref staticFit, ref data, ref opts, clipDistances, sunShadowCams, cascadeShadowMapVP);
+                SceneController.DrawDirectionalShadow(cam, ref staticFit, ref data, ref opts, clipDistances, sunShadowCams, cascadeShadowMapVP, proper.overrideOpaqueMaterial);
                 buffer.SetGlobalMatrixArray(ShaderIDs._ShadowMapVPs, cascadeShadowMapVP);
                 buffer.SetGlobalTexture(ShaderIDs._DirShadowMap, SunLight.current.shadowmapTexture);
                 cbdr.dirLightShadowmap = SunLight.current.shadowmapTexture;
@@ -266,7 +268,7 @@ namespace MPipeline
                         if (!light.useShadowCache || light.updateShadowCache)
                         {
                             light.updateShadowCache = false;
-                            SceneController.DrawPointLight(light, localLightShadowLayer, ref ptLitStr, cubeDepthMaterial, buffer, cullShader, i, ref data, cubemapVPMatrices.unsafePtr, cbdr.cubeArrayMap, cam.inverseRender);
+                            SceneController.DrawPointLight(light, localLightShadowLayer, ref ptLitStr, cubeDepthMaterial, buffer, cullShader, i, ref data, cubemapVPMatrices.unsafePtr, cbdr.cubeArrayMap, cam.inverseRender, proper.overrideOpaqueMaterial);
                         }
                         ptLitStr.shadowIndex = light.ShadowIndex;
                         //TODO
@@ -304,7 +306,7 @@ namespace MPipeline
                         if (!mlight.useShadowCache || mlight.updateShadowCache)
                         {
                             mlight.updateShadowCache = false;
-                            SceneController.DrawSpotLight(buffer, mlight, localLightShadowLayer, data.resources.shaders.gpuFrustumCulling, ref data, mlight.shadowCam, ref spot, ref spotBuffer, cam.inverseRender);
+                            SceneController.DrawSpotLight(buffer, mlight, localLightShadowLayer, data.resources.shaders.gpuFrustumCulling, ref data, mlight.shadowCam, ref spot, ref spotBuffer, cam.inverseRender, proper.overrideOpaqueMaterial);
                         }
                         spot.shadowIndex = mlight.ShadowIndex;
                     }
@@ -415,8 +417,6 @@ namespace MPipeline
             buffer.ReleaseTemporaryRT(_DownSampledDepth2);
             buffer.ReleaseTemporaryRT(_DownSampledDepth3);
             buffer.SetGlobalVector(ShaderIDs._TileSize, new Vector2(tileSize.x, tileSize.y));
-            RenderPipeline.AddTempRtToReleaseList(ShaderIDs._PointLightTile);
-            RenderPipeline.AddTempRtToReleaseList(ShaderIDs._SpotLightTile);
         }
 
         [Unity.Burst.BurstCompile]

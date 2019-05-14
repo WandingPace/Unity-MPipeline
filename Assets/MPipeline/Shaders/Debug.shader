@@ -1,10 +1,14 @@
 ﻿Shader "Unlit/Debug"
 {
+    Properties
+    {
+        _ZTest("_zt", int) = 0
+    }
     SubShader
     {
-        ZTest Always Cull off ZWrite off
-        Blend one one
-       Tags{ "LightMode" = "Transparent" "Queue" = "Transparent"}
+        ZTest [_ZTest]
+        ZWrite off
+        Cull off
         Pass
         {
             CGPROGRAM
@@ -27,12 +31,12 @@
             v2f vert (appdata v)
             {
                 v2f o;
-                o.vertex = v.vertex;
+                o.vertex = (v.vertex);
                 return o;
             }
-            void frag (v2f i, out float4 first : SV_TARGET0)
+            void frag (v2f i, out float4 outGBuffer0 : SV_TARGET)
             {
-                first = 0.01;
+                outGBuffer0 = 1;
             }
             ENDCG
         }

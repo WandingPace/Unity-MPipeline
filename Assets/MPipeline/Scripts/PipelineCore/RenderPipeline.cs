@@ -26,13 +26,8 @@ namespace MPipeline
         public PipelineResources resources;
         public static bool renderingEditor { get; private set; }
         public static PipelineResources.CameraRenderingPath currentPath { get; private set; }
-        private static NativeList<int> ReleaseList;
         private static NativeDictionary<UIntPtr, int, PtrEqual> eventsGuideBook;
         private static List<Action<CommandBuffer>> bufferAfterFrame = new List<Action<CommandBuffer>>(10);
-        public static void AddTempRtToReleaseList(int tar)
-        {
-            ReleaseList.Add(tar);
-        }
 #if UNITY_EDITOR
         private struct EditorBakeCommand
         {
@@ -44,10 +39,10 @@ namespace MPipeline
         }
         private static List<EditorBakeCommand> bakeList = new List<EditorBakeCommand>();
         public static void AddRenderingMissionInEditor(
-            NativeList<float4x4> worldToCameras, 
-            NativeList<float4x4> projections, 
-            PipelineCamera targetCameras, 
-            RenderTexture texArray, 
+            NativeList<float4x4> worldToCameras,
+            NativeList<float4x4> projections,
+            PipelineCamera targetCameras,
+            RenderTexture texArray,
             CommandBuffer buffer)
         {
             bakeList.Add(new EditorBakeCommand
@@ -93,7 +88,6 @@ namespace MPipeline
 
         public RenderPipeline(PipelineResources resources)
         {
-            ReleaseList = new NativeList<int>(10, Allocator.Persistent);
             eventsGuideBook = new NativeDictionary<UIntPtr, int, PtrEqual>(resources.availiableEvents.Length, Allocator.Persistent, new PtrEqual());
             resources.SetRenderingPath();
             var allEvents = resources.allEvents;
@@ -102,6 +96,10 @@ namespace MPipeline
             this.resources = resources;
             current = this;
             data.buffer = new CommandBuffer();
+            for (int i = 0; i < resources.availiableEvents.Length; ++i)
+            {
+                resources.availiableEvents[i].InitDependEventsList();
+            }
             for (int i = 0; i < resources.availiableEvents.Length; ++i)
             {
                 eventsGuideBook.Add(new UIntPtr(MUnsafeUtility.GetManagedPtr(resources.availiableEvents[i].GetType())), i);
@@ -115,7 +113,6 @@ namespace MPipeline
 
         protected override void Dispose(bool disposing)
         {
-            ReleaseList.Dispose();
             eventsGuideBook.Dispose();
             base.Dispose(disposing);
             if (current == this)
@@ -124,15 +121,13 @@ namespace MPipeline
             }
             data.buffer.Dispose();
             var allEvents = resources.allEvents;
-            foreach (var i in allEvents)
+            for (int i = 0; i < resources.availiableEvents.Length; ++i)
             {
-                if (i != null)
-                {
-                    foreach (var j in i)
-                    {
-                        j.DisposeEvent();
-                    }
-                }
+                resources.availiableEvents[i].DisposeEvent();
+            }
+            for (int i = 0; i < resources.availiableEvents.Length; ++i)
+            {
+                resources.availiableEvents[i].DisposeDependEventsList();
             }
             foreach (var i in PipelineCamera.allCamera)
             {
@@ -151,8 +146,8 @@ namespace MPipeline
             UnsafeUtility.MemClear(propertyCheckedFlags, resources.allEvents.Length);
             GraphicsSettings.useScriptableRenderPipelineBatching = resources.useSRPBatcher;
             SceneController.SetState();
-            int tempID = Shader.PropertyToID("_TempRT");
 #if UNITY_EDITOR
+            int tempID = Shader.PropertyToID("_TempRT");
             foreach (var pair in bakeList)
             {
                 PipelineCamera pipelineCam = pair.pipelineCamera;
@@ -201,6 +196,7 @@ namespace MPipeline
                     {
                         renderingEditor = false;
                     }
+
                     pipelineCam = MUnsafeUtility.GetObject<PipelineCamera>(pipelineCamPtr.ToPointer());
                     Render(pipelineCam, ref renderContext, cam, propertyCheckedFlags);
                     data.ExecuteCommandBuffer();
@@ -271,11 +267,6 @@ namespace MPipeline
                     e.FrameUpdate(pipelineCam, ref data);
                 }
             }
-            foreach (var i in ReleaseList)
-            {
-                data.buffer.ReleaseTemporaryRT(i);
-            }
-            ReleaseList.Clear();
         }
     }
 }
