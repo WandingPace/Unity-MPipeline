@@ -9,7 +9,7 @@ Material:
   m_PrefabAsset: {fileID: 0}
   m_Name: Red
   m_Shader: {fileID: 4800000, guid: f7f0d8bc677efcc44b8b3ea293d2b74f, type: 3}
-  m_ShaderKeywords: 
+  m_ShaderKeywords: LIT_ENABLE
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -86,8 +86,11 @@ Material:
     - _SpecularHighlights: 1
     - _SpecularIntensity: 0
     - _SrcBlend: 1
+    - _Stencil: 1
     - _UVSec: 0
+    - _ZTest: 2
     - _ZWrite: 1
     m_Colors:
     - _Color: {r: 1, g: 0, b: 0, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+  m_BuildTextureStacks: []
